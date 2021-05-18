@@ -1,0 +1,372 @@
+#+startup: latexpreview
+
+* Solutions
+
+** 1
+
+   #+begin_src sh :results output
+     ./process-run.py -l 5:100,5:100
+   #+end_src
+
+   #+RESULTS:
+   #+begin_example
+   Produce a trace of what would happen when you run these processes:
+   Process 0
+     cpu
+     cpu
+     cpu
+     cpu
+     cpu
+
+   Process 1
+     cpu
+     cpu
+     cpu
+     cpu
+     cpu
+
+   Important behaviors:
+     System will switch when the current process is FINISHED or ISSUES AN IO
+     After IOs, the process issuing the IO will run LATER (when it is its turn)
+
+   #+end_example
+  
+   - The first process runs from $t_1$ to $t_5$ because it has 100% cpu
+   - The second process runs from $t_6$ to $t_{10}$ because it has 100% cpu
+
+   - total cpu = 100%
+   
+** Question 2
+
+   #+begin_src sh
+     ./process-run.py -l 4:100,1:0
+   #+end_src
+
+   - The first process runs from $t_1$ to $t_4$
+   - As per the solution in the README file, a process still uses a CPU
+     instruction to start an IO, and uses another CPU instruction to stop an IO
+   - Therefore, the second process starts at $t_5$ with 1 CPU instruction
+   - The question doesn't provide the number of instructions with the second
+     process, we assume it's 5?
+   - The second process waits for IO from $t_6$ to $t_{10}$
+   - It then again uses a CPU instruction to finish the IO at $t_{11}$
+   
+   - CPU: 54%
+   - IO: 46%
+
+   #+begin_src sh :results output
+     ./process-run.py -l 4:100,1:0 -c -p
+   #+end_src
+
+   #+RESULTS:
+   #+begin_example
+   Time        PID: 0        PID: 1           CPU           IOs
+     1        RUN:cpu         READY             1          
+     2        RUN:cpu         READY             1          
+     3        RUN:cpu         READY             1          
+     4        RUN:cpu         READY             1          
+     5           DONE        RUN:io             1          
+     6           DONE       WAITING                           1
+     7           DONE       WAITING                           1
+     8           DONE       WAITING                           1
+     9           DONE       WAITING                           1
+    10           DONE       WAITING                           1
+    11*          DONE   RUN:io_done             1          
+
+   Stats: Total Time 11
+   Stats: CPU Busy 6 (54.55%)
+   Stats: IO Busy  5 (45.45%)
+
+   #+end_example
+
+** Question 3
+
+   - Since the first process just issues an IO and waits, CPU can start the
+     second process.
+   | t | P0       | P1      | CPU |  IO |
+   |---+----------+---------+-----+-----|
+   | 1 | issue IO |         |   1 |     |
+   | 2 | waiting  | running |   1 |   1 |
+   | 3 | waiting  | running |   1 |   1 |
+   | 4 | waiting  | running |   1 |   1 |
+   | 5 | waiting  | running |   1 |   1 |
+   | 6 | waiting  | done    |     |   1 |
+   | 7 | issue IO | done    |   1 |     |
+   |---+----------+---------+-----+-----|
+   |   |          |         | 6/7 | 5/7 |
+
+   CPU: 85.7%
+   IO: 71.5%
+
+   #+begin_src sh :results output
+     ./process-run.py -l 1:0,4:100 -c -p
+   #+end_src
+
+   #+RESULTS:
+   #+begin_example
+   Time        PID: 0        PID: 1           CPU           IOs
+     1         RUN:io         READY             1          
+     2        WAITING       RUN:cpu             1             1
+     3        WAITING       RUN:cpu             1             1
+     4        WAITING       RUN:cpu             1             1
+     5        WAITING       RUN:cpu             1             1
+     6        WAITING          DONE                           1
+     7*   RUN:io_done          DONE             1          
+
+   Stats: Total Time 7
+   Stats: CPU Busy 6 (85.71%)
+   Stats: IO Busy  5 (71.43%)
+
+   #+end_example
+
+   
+** Question 4
+
+   The CPU doesn't shift to another process which the first is waiting for an IO
+
+      |  t | P0       | P1      |       CPU |        IO |
+      |----+----------+---------+-----------+-----------|
+      |  1 | issue IO |         |         1 |           |
+      |  2 | waiting  |         |           |         1 |
+      |  3 | waiting  |         |           |         1 |
+      |  4 | waiting  |         |           |         1 |
+      |  5 | waiting  |         |           |         1 |
+      |  6 | waiting  |         |           |         1 |
+      |  7 | issue IO |         |         1 |           |
+      |  8 | done     | running |         1 |           |
+      |  9 | done     | running |         1 |           |
+      | 10 | done     | running |         1 |           |
+      | 11 | done     | running |         1 |           |
+      |----+----------+---------+-----------+-----------|
+      |    |          |         | 54.545455 | 45.454545 |
+      #+TBLFM: $4=((6 / 11) * 100)::$5=((5 / 11) * 100)
+
+      #+begin_src sh :results output
+        ./process-run.py -l 1:0,4:100 -S SWITCH_ON_END -c -p
+      #+end_src
+
+      #+RESULTS:
+      #+begin_example
+      Time        PID: 0        PID: 1           CPU           IOs
+        1         RUN:io         READY             1          
+        2        WAITING         READY                           1
+        3        WAITING         READY                           1
+        4        WAITING         READY                           1
+        5        WAITING         READY                           1
+        6        WAITING         READY                           1
+        7*   RUN:io_done         READY             1          
+        8           DONE       RUN:cpu             1          
+        9           DONE       RUN:cpu             1          
+       10           DONE       RUN:cpu             1          
+       11           DONE       RUN:cpu             1          
+
+      Stats: Total Time 11
+      Stats: CPU Busy 6 (54.55%)
+      Stats: IO Busy  5 (45.45%)
+
+      #+end_example
+
+** Question 5
+
+   This is the default behaviour, and therefore exactly like [[*Question 3][question 3]].
+
+   #+begin_src sh :results output 
+     ./process-run.py -l 1:0,4:100 -S SWITCH_ON_END -c -p
+   #+end_src
+
+   #+RESULTS:
+   #+begin_example
+   Time        PID: 0        PID: 1           CPU           IOs
+     1         RUN:io         READY             1          
+     2        WAITING         READY                           1
+     3        WAITING         READY                           1
+     4        WAITING         READY                           1
+     5        WAITING         READY                           1
+     6        WAITING         READY                           1
+     7*   RUN:io_done         READY             1          
+     8           DONE       RUN:cpu             1          
+     9           DONE       RUN:cpu             1          
+    10           DONE       RUN:cpu             1          
+    11           DONE       RUN:cpu             1          
+
+   Stats: Total Time 11
+   Stats: CPU Busy 6 (54.55%)
+   Stats: IO Busy  5 (45.45%)
+
+   #+end_example
+   
+** Question 6
+
+
+   - I had a couple questions with the way this is implemented
+   - What do they mean by "whatever was running at the time keeps running"?
+     - In the following table, since the process doing just the IO waits for 5
+       time units, and the others also complete in 5 time units, at $t_6$ it
+       reaches a weird state where P1 is done, but nothing has been running
+       before. Should it start a new process now?
+
+   -  I'm assuming that P0 is waiting for the IO now throughout $t_2$ to $t_16$
+     with the findings/questions that I listed above?
+   
+      |  t | P0       | P1      | P2      | P3      | CPU |    IO |
+      |----+----------+---------+---------+---------+-----+-------|
+      |  1 | issue IO |         |         |         |   1 |       |
+      |  2 | waiting  | running |         |         |   1 |     1 |
+      |  3 | waiting  | running |         |         |   1 |     1 |
+      |  4 | waiting  | running |         |         |   1 |     1 |
+      |  5 | waiting  | running |         |         |   1 |     1 |
+      |  6 | waiting  | running |         |         |   1 |     1 |
+      |  7 |          | done    | running |         |   1 |     1 |
+      |  8 |          | done    | running |         |   1 |     1 |
+      |  9 |          | done    | running |         |   1 |     1 |
+      | 10 |          | done    | running |         |   1 |     1 |
+      | 11 |          | done    | running |         |   1 |     1 |
+      | 12 |          | done    | done    | running |   1 |     1 |
+      | 13 |          | done    | done    | running |   1 |     1 |
+      | 14 |          |         |         | running |   1 |     1 |
+      | 15 |          |         |         | running |   1 |     1 |
+      | 16 |          |         |         | running |   1 |     1 |
+      |----+----------+---------+---------+---------+-----+-------|
+      |    |          |         |         |         | 100 | 93.75 |
+      #+TBLFM: $6=((16/16) * 100)::$7=((15/16)*100)
+
+
+   - The other option would've been (with the usual settings):
+
+     |  t | P0       | P1      | P2      | P3      | CPU |    IO |
+     |----+----------+---------+---------+---------+-----+-------|
+     |  1 | issue IO |         |         |         |   1 |       |
+     |  2 | waiting  | running |         |         |   1 |     1 |
+     |  3 | waiting  | running |         |         |   1 |     1 |
+     |  4 | waiting  | running |         |         |   1 |     1 |
+     |  5 | waiting  | running |         |         |   1 |     1 |
+     |  6 | waiting  | running |         |         |   1 |     1 |
+     |  7 | done     | done    | running |         |   1 |       |
+     |  8 | done     | done    | running |         |   1 |       |
+     |  9 | done     | done    | running |         |   1 |       |
+     | 10 | done     | done    | running |         |   1 |       |
+     | 11 | done     | done    | running |         |   1 |       |
+     | 12 | done     | done    | done    | running |   1 |       |
+     | 13 | done     | done    | done    | running |   1 |       |
+     | 14 | done     | done    | done    | running |   1 |       |
+     | 15 | done     | done    | done    | running |   1 |       |
+     | 16 | done     | done    | done    | running |   1 |       |
+     |----+----------+---------+---------+---------+-----+-------|
+     |    |          |         |         |         | 100 | 31.25 |
+     #+TBLFM: $7=((5/16)*100)
+
+   - This looks like a better way to utilize resources because although CPU is
+       fully utilised, the IO isn't and the processes complete at the best
+       times.
+
+     #+begin_src sh :results output
+       ./process-run.py -l 3:0,5:100,5:100,5:100 -S SWITCH_ON_IO -I IO_RUN_LATER -c -p
+     #+end_src
+
+     #+RESULTS:
+     #+begin_example
+     Time        PID: 0        PID: 1        PID: 2        PID: 3           CPU           IOs
+       1         RUN:io         READY         READY         READY             1          
+       2        WAITING       RUN:cpu         READY         READY             1             1
+       3        WAITING       RUN:cpu         READY         READY             1             1
+       4        WAITING       RUN:cpu         READY         READY             1             1
+       5        WAITING       RUN:cpu         READY         READY             1             1
+       6        WAITING       RUN:cpu         READY         READY             1             1
+       7*         READY          DONE       RUN:cpu         READY             1          
+       8          READY          DONE       RUN:cpu         READY             1          
+       9          READY          DONE       RUN:cpu         READY             1          
+      10          READY          DONE       RUN:cpu         READY             1          
+      11          READY          DONE       RUN:cpu         READY             1          
+      12          READY          DONE          DONE       RUN:cpu             1          
+      13          READY          DONE          DONE       RUN:cpu             1          
+      14          READY          DONE          DONE       RUN:cpu             1          
+      15          READY          DONE          DONE       RUN:cpu             1          
+      16          READY          DONE          DONE       RUN:cpu             1          
+      17    RUN:io_done          DONE          DONE          DONE             1          
+      18         RUN:io          DONE          DONE          DONE             1          
+      19        WAITING          DONE          DONE          DONE                           1
+      20        WAITING          DONE          DONE          DONE                           1
+      21        WAITING          DONE          DONE          DONE                           1
+      22        WAITING          DONE          DONE          DONE                           1
+      23        WAITING          DONE          DONE          DONE                           1
+      24*   RUN:io_done          DONE          DONE          DONE             1          
+      25         RUN:io          DONE          DONE          DONE             1          
+      26        WAITING          DONE          DONE          DONE                           1
+      27        WAITING          DONE          DONE          DONE                           1
+      28        WAITING          DONE          DONE          DONE                           1
+      29        WAITING          DONE          DONE          DONE                           1
+      30        WAITING          DONE          DONE          DONE                           1
+      31*   RUN:io_done          DONE          DONE          DONE             1          
+
+     Stats: Total Time 31
+     Stats: CPU Busy 21 (67.74%)
+     Stats: IO Busy  15 (48.39%)
+
+     #+end_example
+
+** Question 7
+
+   - It's a better option to run the process that just completed IO to save from
+     yet another context switch
+   
+     |  t | P0       | P1      | P2      | P3      | CPU |        IO |
+     |----+----------+---------+---------+---------+-----+-----------|
+     |  1 | issue IO |         |         |         |   1 |           |
+     |  2 | waiting  | running |         |         |   1 |         1 |
+     |  3 | waiting  | running |         |         |   1 |         1 |
+     |  4 | waiting  | running |         |         |   1 |         1 |
+     |  5 | waiting  | running |         |         |   1 |         1 |
+     |  6 | waiting  | running |         |         |   1 |         1 |
+     |  7 | IO end   | done    | ready   | ready   |   1 |           |
+     |  8 | issue IO | done    | running |         |   1 |           |
+     |  9 | waiting  | done    | running |         |   1 |         1 |
+     | 10 | waiting  | done    | running |         |   1 |         1 |
+     | 11 | waiting  | done    | running |         |   1 |         1 |
+     | 12 | waiting  | done    | running |         |   1 |         1 |
+     | 13 | waiting  | done    | done    |         |   1 |         1 |
+     | 14 | IO end   | done    | done    |         |   1 |           |
+     | 15 | issue IO | done    | done    | ready   |   1 |           |
+     | 16 | waiting  | done    | done    | running |   1 |         1 |
+     | 17 | waiting  | done    | done    | running |   1 |         1 |
+     | 18 | waiting  |         |         | running |   1 |         1 |
+     | 19 | waiting  |         |         | running |   1 |         1 |
+     | 20 | waiting  |         |         | running |   1 |         1 |
+     | 21 | IO end   |         |         |         |   1 |           |
+     |    |          |         |         |         | 100 | 71.428571 |
+     #+TBLFM: $6=((21/21)*100)::$7=((15/21)*100)
+
+     #+begin_src sh :results output
+       ./process-run.py -l 3:0,5:100,5:100,5:100 -S SWITCH_ON_IO -I IO_RUN_IMMEDIATE -c -p
+     #+end_src
+
+     #+RESULTS:
+     #+begin_example
+     Time        PID: 0        PID: 1        PID: 2        PID: 3           CPU           IOs
+       1         RUN:io         READY         READY         READY             1          
+       2        WAITING       RUN:cpu         READY         READY             1             1
+       3        WAITING       RUN:cpu         READY         READY             1             1
+       4        WAITING       RUN:cpu         READY         READY             1             1
+       5        WAITING       RUN:cpu         READY         READY             1             1
+       6        WAITING       RUN:cpu         READY         READY             1             1
+       7*   RUN:io_done          DONE         READY         READY             1          
+       8         RUN:io          DONE         READY         READY             1          
+       9        WAITING          DONE       RUN:cpu         READY             1             1
+      10        WAITING          DONE       RUN:cpu         READY             1             1
+      11        WAITING          DONE       RUN:cpu         READY             1             1
+      12        WAITING          DONE       RUN:cpu         READY             1             1
+      13        WAITING          DONE       RUN:cpu         READY             1             1
+      14*   RUN:io_done          DONE          DONE         READY             1          
+      15         RUN:io          DONE          DONE         READY             1          
+      16        WAITING          DONE          DONE       RUN:cpu             1             1
+      17        WAITING          DONE          DONE       RUN:cpu             1             1
+      18        WAITING          DONE          DONE       RUN:cpu             1             1
+      19        WAITING          DONE          DONE       RUN:cpu             1             1
+      20        WAITING          DONE          DONE       RUN:cpu             1             1
+      21*   RUN:io_done          DONE          DONE          DONE             1          
+
+     Stats: Total Time 21
+     Stats: CPU Busy 21 (100.00%)
+     Stats: IO Busy  15 (71.43%)
+
+     #+end_example
+
