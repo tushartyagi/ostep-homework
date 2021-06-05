@@ -1,0 +1,72 @@
+* Question 1
+
+  Since the child process gets its own copy of the address space and registers,
+  the value should be visible to both the parent and child process.
+  
+  I've tried adding sleep calls to the parent to show that the parent may not be
+  able to access the address space. 
+
+* Question 2
+
+  The file is written by both the processes and it works fine.
+  I did some digging around because I remember reading somewhere (probably when
+  I was configuring mu4e or something related to email locally) that the file
+  system has /some/ guarantees for concurrent reading/writing files by different
+  processes.
+
+  There's this [[https://stackoverflow.com/a/12943431/375339][SO answer]] says that the OS gives no guarantees. Another comment
+  on the answer points to [[http://lkml.iu.edu/hypermail/linux/kernel/0208.0/0251.html][this mail]] by Linus which states that in order to make
+  it atomic, we have to make sure that what we want to write goes in a single
+  =write= call (upto a buffer limit set by the FS), since multiple =write= calls
+  back to back aren't guaranteed to be atomic.
+
+  Based on that, I wrote =q2b.c= which tries to write multiple calls with
+  =sleep= to see if the stuff is interspersed. It is, but nothing is
+  overwritten. 
+  
+* Question 3
+
+  Tried rearranging the =if/else= blocks but that didn't change anything. The
+  parent prints before the child.
+
+  I can go for =sleep= call but they haven't taught it in the code, although it
+  was mentioned as one of the different states of a process.
+
+  Another thing which I realised was to maybe do an IO from the parent because
+  that /might/ produce a context switch. But it didn't probably because the OS is
+  avoiding that switch in order to keep the parent running (if it started
+  already)? Again this is something that I saw in one of the questions in the
+  previous section.
+
+  [[https://www.csl.mtu.edu/cs4411.ck/www/NOTES/process/fork/create.html][This link]] suggests that the =printf= calls are buffered but =write= calls are
+  not. Which kind of match what Linus talked about as the reason for making
+  these calls atomic (link in [[*Question 2][question 2]]).
+
+  So right now I don't have the answer to this.
+
+* Question 4
+
+  The =exec= family of function follow a standardized approach:
+
+  - =execl*= take in a list of arguments for argv[1]...argv[n]
+  - =execv*= take in an array/vector for the args. The vector *must be* null
+    terminated.
+
+  - =exec*e= (ending with e) can take in the environment. One good use (as per
+    [[https://stackoverflow.com/a/41871366/375339][this SO answer]]) is to override the environment for security purposes like
+    login shell.
+
+* Question 5
+
+  The wait returns the pid of the child process that terminated. We can also
+  pass in an integer to see what was the exit status of the child process.
+
+  =q5.c= has a single child, but =q5b.c= has parent forking again.
+
+  Just like =wait=, there's another =waitpid= which allows to wait for a
+  specific child process by passing it its =pid=.
+
+* Question 6
+
+  Already did this in the previous question.
+
